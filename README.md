@@ -10,6 +10,10 @@ Here's the descriptions and requirements for input parameters:
 Some additional notes that might be necessary to follow:
 * Sort input BAM files
 
+To-Do:
+* Tweak each process' memory, CPU, time requirements
+* Refactor the workflow so that process sample_GLs runs in parallel with process chunk_chr. Might save a few minutes.
+
 Workflow follows the steps from this tutorial: https://odelaneau.github.io/GLIMPSE/docs/tutorials/getting_started/#imputation-using-1000gp-reference-panel
 
 #### Good luck!
