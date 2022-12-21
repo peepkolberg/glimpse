@@ -1,2 +1,6 @@
 **/._*
 **/.DS_Store
+work/*
+results/*
+slurm-*.out
+.nextflow*
