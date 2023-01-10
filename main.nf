@@ -120,7 +120,7 @@ process impute {
 }
 
 process sample {
-    publishDir "${projectDir}/results.glimpse/${sample}/${chr}", mode: "move"
+    publishDir "${projectDir}/results/glimpse/${sample}/${chr}", mode: "copy"
 
     input:
         tuple val(sample), val(chr), path(ligated), path(ligated_idx)
