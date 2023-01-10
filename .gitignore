@@ -2,6 +2,8 @@
 **/.DS_Store
 work/*
 results/*
+results.*
+logs/*
 results.glimpse/*
 slurm-*.out
 .nextflow*
