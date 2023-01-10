@@ -1,4 +1,4 @@
-To run the workflow, submit `run.sh` to HPC. Results will appear in directory `results.glimpse`.
+To run the workflow, submit `run.sh` to HPC. Imputation results will appear in directory `results/glimpse`.
 
 Here's the descriptions and requirements for input parameters:
 * **--samples** TSV file with sample IDs and BAM files. Example in [data/samples.tsv](https://github.com/peepkolberg/glimpse/blob/main/data/samples.tsv). Each sample expects an index file to be present in the same directory as the BAM file. Index file must have the same name as BAM file + ".bai". This is hard-coded in main.nf workflow{} section.
