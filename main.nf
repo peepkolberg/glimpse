@@ -74,6 +74,7 @@ process chunk_chr {
 }
 
 // TODO: Run in parallel with the previous process.
+// TODO: To impute X-chromosome, give --ploidy-file to bcftools call. Use val(chr) to determine ploidy. 
 process sample_GLs {
     input:
         tuple val(sample), path(bam), path(bam_idx), path(ref_gen), path(ref_gen_idx), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(chunks)
@@ -84,10 +85,15 @@ process sample_GLs {
     script:
         sample_GLs = "${sample}.chr${chr}.GLs.vcf.gz"
         sample_GLs_idx = "${sample_GLs}.csi"
+        sample_name = "sample_name.txt"
+        sample_GLs_temp = "${sample}.chr${chr}.GLs.new_samplename.vcf.gz"
 
         """
         bcftools mpileup -f ${ref_gen} --skip-indels --redo-BAQ --annotate 'FORMAT/DP' -T ${sites_vcf} --regions ${chr} ${bam} -Ou | bcftools call --threads 4 -Aim -C alleles -T ${sites_tsv} -Oz -o ${sample_GLs}
-        bcftools index --threads 4 -f ${sample_GLs}
+        echo $sample > $sample_name
+        bcftools reheader --samples $sample_name --threads 4 $sample_GLs -o $sample_GLs_temp
+        mv $sample_GLs_temp $sample_GLs
+        bcftools index -f $sample_GLs
         """
 }
 
@@ -120,13 +126,13 @@ process impute {
 }
 
 process sample {
-    publishDir "${projectDir}/results/glimpse/${sample}/${chr}", mode: "copy"
-
+    publishDir "${projectDir}/results/glimpse/phased/${sample}/chr${chr}", mode: "move", pattern: "${phased}*"
+    
     input:
         tuple val(sample), val(chr), path(ligated), path(ligated_idx)
     
     output:
-        tuple path(ligated), path(ligated_idx), path(phased), path(phased_idx)
+        tuple val(sample), path(ligated), path(ligated_idx), path(phased), path(phased_idx)
     
     script:
         phased = "${sample}.chr${chr}.phased.bcf"
@@ -136,6 +142,47 @@ process sample {
         GLIMPSE_sample --thread 4 --input ${ligated} --solve --output ${phased}
         bcftools index --threads 4 -f ${phased}
         """    
+}
+
+// Everything from this point on is my original creation.
+process concat_chrs {
+    input:
+        tuple val(sample), path(chromosomes_bcfs), path(chromosomes_idxs)
+
+    output:
+        tuple path(sorted), path(sorted_idx)
+
+    script:
+        concat_filenames = "concat_filenames.txt"
+        sorted = "${sample}.all_chrs.sorted.bcf"
+        sorted_idx = "${sorted}.csi"
+
+        """
+        ls ${sample}.chr*.imputed.ligated.bcf > $concat_filenames
+        bcftools concat --threads 4 --file-list $concat_filenames -Ob | bcftools sort -Ob -o $sorted
+        bcftools index --threads 4 $sorted
+        """
+}
+
+process merge_inds {
+    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "move"
+
+    input:
+        path(samples_files)
+
+    output:
+        tuple path(merged), path(merged_idx)
+
+    script:
+        merge_filenames = "merge_filenames.txt"
+        merged = "merged.imputed.ligated.vcf.gz"
+        merged_idx = "${merged}.csi"
+
+        """
+        ls *.all_chrs.sorted.bcf > $merge_filenames
+        bcftools merge -m id --file-list $merge_filenames --threads 4 -Oz -o $merged
+        bcftools index --threads 4 $merged
+        """
 }
 
 
@@ -152,7 +199,7 @@ workflow {
     //split_ref_pan_ch.view()
 
 
-    //println "hg, bam, ref_gen, chr, ref_pan, sites, chunks"
+    //println "sample, bam, ref_gen, chr, ref_pan, sites, chunks"
     job_params_ch = samples_ch
         .map( it -> [it[0], it[1], it[1]+".bai"] )
         .combine(ref_gen_ch)
@@ -160,17 +207,29 @@ workflow {
         .combine(split_ref_pan_ch)
     //job_params_ch.view()
 
-    //println "hg, chr, ref_pan, chunks, sample_GLs"
+    //println "sample, chr, ref_pan, chunks, sample_GLs"
     job_params_ch = sample_GLs(job_params_ch)
     //job_params_ch.view()
         
 
-    //println "hg, chr, ref_pan, chunks, sample_GLs, map"
+    //println "sample, chr, ref_pan, chunks, sample_GLs, map"
     job_params_ch = job_params_ch
         .combine(genetic_map_ch)
         .map( it -> [it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7]+"/chr"+it[1]+".gmap.gz"] )
     //job_params_ch.view()
 
-    //println "ligated, phased"
-    impute(job_params_ch) | sample// | view()
+    //println "sample, ligated, phased"
+    imputed_chromosomes_ch = impute(job_params_ch) | sample 
+    //imputed_chromosomes_ch.view()
+
+    //println "sample, [ligated]"
+    imputed_chromosomes_grouped_ch = imputed_chromosomes_ch
+        .map( it -> it[0..2] )  // phased files were published in the previous process. Continue only with ligated.
+        .groupTuple()
+    //imputed_chromosomes_grouped_ch.view()
+
+    //println "merged"
+    concat_chrs(imputed_chromosomes_grouped_ch) | \
+    collect | \
+    merge_inds //| view()
 }
