@@ -30,7 +30,7 @@ process split_ref_pan {
         ref_pan_chr_idx = "${ref_pan_chr}.csi"
 
         """
-        bcftools view -r ${chr} -m2 -M2 -v snps --threads 4 ${ref_pan} -Oz -o ${ref_pan_chr}
+        bcftools view -r ${chr} -m2 -M2 --threads 4 ${ref_pan} -Oz -o ${ref_pan_chr}
         bcftools index -f --threads 4 ${ref_pan_chr}
         """
 }
@@ -49,9 +49,9 @@ process extract_ref_pan_sites {
         sites_tsv_idx = "${sites_tsv}.tbi"
 
         """
-        bcftools view --drop-genotypes --threads 4 ${ref_pan_chr} -Oz -o ${sites_vcf}
+        bcftools view --drop-genotypes -v snps --threads 4 ${ref_pan_chr} -Oz -o ${sites_vcf}
         bcftools index --threads 4 -f ${sites_vcf}
-        bcftools query -f '%CHROM\t%POS\t%REF,%ALT\n' ${sites_vcf} | bgzip --threads 4 -c > ${sites_tsv}
+        bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_vcf} | bgzip --threads 4 -c > ${sites_tsv}
         tabix -s1 -b2 -e2 ${sites_tsv}
         """
 }
