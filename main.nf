@@ -134,7 +134,7 @@ process impute {
 }
 
 process sample {
-    publishDir "${projectDir}/results/glimpse/phased/${sample}/chr${chr}", mode: "move", pattern: "${phased}*"
+    publishDir "${projectDir}/results/glimpse/phased/${sample}/chr${chr}", mode: "copy", pattern: "${phased}*"
     
     input:
         tuple val(sample), val(chr), path(ligated), path(ligated_idx)
