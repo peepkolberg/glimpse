@@ -75,7 +75,7 @@ process chunk_chr {
         window_size = 2000000
         buffer_size = 200000
         chunks = "ref_pan.chr${chr}.chunks.txt"
-
+        
         """
         GLIMPSE_chunk --input ${sites_vcf} --region ${chr} --window-size ${window_size} --buffer-size ${buffer_size} --thread 4 --output ${chunks}
         """
@@ -95,7 +95,7 @@ process sample_GLs {
         sample_GLs_idx = "${sample_GLs}.csi"
         sample_name = "sample_name.txt"
         sample_GLs_temp = "${sample}.chr${chr}.GLs.new_samplename.vcf.gz"
-
+        
         """
         bcftools mpileup -f ${ref_gen} --redo-BAQ --annotate 'FORMAT/DP' -T ${sites_no_indels_vcf} --regions ${chr} ${bam} -Ou | bcftools call --threads 4 -Aim -C alleles -T ${sites_no_indels_tsv} -Oz -o ${sample_GLs}
         echo $sample > $sample_name
@@ -235,7 +235,7 @@ workflow {
     //println "chr, ref_pan"
     ref_pan_chr_ch = chrs_ch
         .combine(ref_pan_ch)
-        .map( it -> [it[0], it[1], it[1]+".csi"] )
+        .map( it -> it + ["${it[1]}.csi"])
     //ref_pan_chr_ch.view()
 
     //println "chr, ref_pan, sites, chunks"
@@ -245,9 +245,9 @@ workflow {
 
     //println "sample, bam, ref_gen, chr, ref_pan, sites, chunks"
     job_params_ch = samples_ch
-        .map( it -> [it[0], it[1], it[1]+".bai"] )
+        .map( it -> it + ["${it[1]}.bai"] )
         .combine(ref_gen_ch)
-        .map( it -> [it[0], it[1], it[2], it[3], it[3]+".fai"] )
+        .map( it -> it + ["${it[3]}.fai"] )
         .combine(split_ref_pan_ch)
     //job_params_ch.view()
 
@@ -259,7 +259,7 @@ workflow {
     //println "sample, chr, ref_pan, chunks, sample_GLs, map"
     job_params_ch = job_params_ch
         .combine(genetic_map_ch)
-        .map( it -> [it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7]+"/chr"+it[1]+".gmap.gz"] )
+        .map( it -> it[0..6] + ["${it[7]}/chr${it[1]}.gmap.gz"] )
     //job_params_ch.view()
 
     //println "sample, ligated, phased"
@@ -268,8 +268,8 @@ workflow {
 
     //println "sample, [ligated]"
     imputed_chromosomes_grouped_ch = imputed_chromosomes_ch
-        .map( it -> it[0..2] )  // phased files were published in the previous process. Continue only with ligated.
-        .groupTuple()
+        .map( it -> it[0..2] )  // Phased files were published in the previous process. Continue only with ligated.
+        .groupTuple() // TODO: use the expected values param to specify how many chromosomes were imputed to send to next process ASAP.
     //imputed_chromosomes_grouped_ch.view()
 
     //println "merged"
