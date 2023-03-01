@@ -210,6 +210,25 @@ process fill_tags {
         """
 }
 
+process maf_filter {
+    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
+
+    input:
+        tuple path(merged), path(merged_idx)
+
+    output:
+        tuple path(merged_maf), path(merged_maf_idx)
+
+    script:
+        merged_maf = "merged.imputed.ligated.MAF_1.vcf.gz"
+        merged_maf_idx = "${merged_maf}.csi"
+
+        """
+        bcftools filter -i 'MAF[0] > 0.01' ${merged} -Oz -o ${merged_maf}
+        bcftools index --threads 4 ${merged_maf}
+        """
+}
+
 
 
 workflow {
