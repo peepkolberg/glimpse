@@ -173,8 +173,6 @@ process concat_chrs {
 }
 
 process merge_inds {
-    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "move"
-
     input:
         path(samples_files)
 
@@ -183,13 +181,32 @@ process merge_inds {
 
     script:
         merge_filenames = "merge_filenames.txt"
-        merged = "merged.imputed.ligated.vcf.gz"
+        merged = "merged.imputed.ligated.no_tags.vcf.gz"
         merged_idx = "${merged}.csi"
 
         """
         ls *.all_chrs.sorted.bcf > $merge_filenames
         bcftools merge -m id --file-list $merge_filenames --threads 4 -Oz -o $merged
         bcftools index --threads 4 $merged
+        """
+}
+
+process fill_tags {
+    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
+
+    input:
+        tuple path(merged), path(merged_idx)
+    
+    output:
+        tuple path(merged_fill_tags), path(merged_fill_tags_idx)
+
+    script:
+        merged_fill_tags = "merged.imputed.ligated.vcf.gz"
+        merged_fill_tags_idx = "${merged_fill_tags}.csi"
+
+        """
+        bcftools +fill-tags ${merged} -Oz -o ${merged_fill_tags}
+        bcftools index --threads 4 ${merged_fill_tags}
         """
 }
 
@@ -239,5 +256,7 @@ workflow {
     //println "merged"
     concat_chrs(imputed_chromosomes_grouped_ch) | \
     collect | \
-    merge_inds //| view()
+    merge_inds | \
+    fill_tags | \
+    maf_filter //| view()
 }
