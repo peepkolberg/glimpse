@@ -66,7 +66,7 @@ process extract_ref_pan_sites {
 
 process chunk_chr {
     input:
-        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx)
+        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx)
 
     output:
         tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx), path(chunks)
