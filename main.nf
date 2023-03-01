@@ -30,7 +30,7 @@ process split_ref_pan {
         ref_pan_chr_idx = "${ref_pan_chr}.csi"
 
         """
-        bcftools view -r ${chr} -m2 -M2 --threads 4 ${ref_pan} -Oz -o ${ref_pan_chr}
+        bcftools view -r ${chr} -i "INFO/SVTYPE=''" -m2 -M2 --threads 4 ${ref_pan} -Oz -o ${ref_pan_chr}
         bcftools index -f --threads 4 ${ref_pan_chr}
         """
 }
@@ -40,19 +40,27 @@ process extract_ref_pan_sites {
         tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx)
 
     output:
-        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx)
+        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx)
 
     script:
         sites_vcf = "ref_pan.chr${chr}.sites.vcf.gz"
+        sites_no_indels_vcf = "ref_pan.chr${chr}.sites.no_indels.vcf.gz"
         sites_tsv = "ref_pan.chr${chr}.sites.tsv.gz"
+        sites_no_indels_tsv = "ref_pan.chr${chr}.sites.no_indels.tsv.gz"
         sites_vcf_idx = "${sites_vcf}.csi"
+        sites_no_indels_vcf_idx = "${sites_no_indels_vcf}.csi"
         sites_tsv_idx = "${sites_tsv}.tbi"
-
+        sites_no_indels_tsv_idx = "${sites_no_indels_tsv}.tbi"
+        // Create 2 versions of sites: one has indels, other doesn't
         """
-        bcftools view --drop-genotypes -v snps --threads 4 ${ref_pan_chr} -Oz -o ${sites_vcf}
+        bcftools view --drop-genotypes --threads 4 ${ref_pan_chr} -Oz -o ${sites_vcf}
+        bcftools view --drop-genotypes -v snps --threads 4 ${ref_pan_chr} -Oz -o ${sites_no_indels_vcf}
         bcftools index --threads 4 -f ${sites_vcf}
+        bcftools index --threads 4 -f ${sites_no_indels_vcf}
         bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_vcf} | bgzip --threads 4 -c > ${sites_tsv}
+        bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_no_indels_vcf} | bgzip --threads 4 -c > ${sites_no_indels_tsv}
         tabix -s1 -b2 -e2 ${sites_tsv}
+        tabix -s1 -b2 -e2 ${sites_no_indels_tsv}
         """
 }
 
@@ -61,7 +69,7 @@ process chunk_chr {
         tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx)
 
     output:
-        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(chunks)
+        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx), path(chunks)
 
     script:
         window_size = 2000000
@@ -77,7 +85,7 @@ process chunk_chr {
 // TODO: To impute X-chromosome, give --ploidy-file to bcftools call. Use val(chr) to determine ploidy. 
 process sample_GLs {
     input:
-        tuple val(sample), path(bam), path(bam_idx), path(ref_gen), path(ref_gen_idx), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(chunks)
+        tuple val(sample), path(bam), path(bam_idx), path(ref_gen), path(ref_gen_idx), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx), path(chunks)
 
     output:
         tuple val(sample), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(chunks), path(sample_GLs), path(sample_GLs_idx)
@@ -89,7 +97,7 @@ process sample_GLs {
         sample_GLs_temp = "${sample}.chr${chr}.GLs.new_samplename.vcf.gz"
 
         """
-        bcftools mpileup -f ${ref_gen} --skip-indels --redo-BAQ --annotate 'FORMAT/DP' -T ${sites_vcf} --regions ${chr} ${bam} -Ou | bcftools call --threads 4 -Aim -C alleles -T ${sites_tsv} -Oz -o ${sample_GLs}
+        bcftools mpileup -f ${ref_gen} --redo-BAQ --annotate 'FORMAT/DP' -T ${sites_no_indels_vcf} --regions ${chr} ${bam} -Ou | bcftools call --threads 4 -Aim -C alleles -T ${sites_no_indels_tsv} -Oz -o ${sample_GLs}
         echo $sample > $sample_name
         bcftools reheader --samples $sample_name --threads 4 $sample_GLs -o $sample_GLs_temp
         mv $sample_GLs_temp $sample_GLs
@@ -115,7 +123,7 @@ process impute {
             irg=\$(echo \$line | cut -d" " -f3)
             org=\$(echo \$line | cut -d" " -f4)
             imputed=${sample}.chr${chr}.imputed.\${id}.bcf
-            GLIMPSE_phase --input ${sample_GLs} --reference ${ref_pan_chr} --map ${map} --input-region \$irg --output-region \$org --output \$imputed
+            GLIMPSE_phase --impute-reference-only-variants --input ${sample_GLs} --reference ${ref_pan_chr} --map ${map} --input-region \$irg --output-region \$org --output \$imputed
             bcftools index --threads 4 -f \$imputed
         done < ${chunks}
 
