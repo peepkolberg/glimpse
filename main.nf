@@ -30,7 +30,7 @@ process split_ref_pan {
         ref_pan_chr_idx = "${ref_pan_chr}.csi"
 
         """
-        bcftools view -r ${chr} -m2 -M2 -v snps --threads 4 ${ref_pan} -Oz -o ${ref_pan_chr}
+        bcftools view -r ${chr} -i "INFO/SVTYPE=''" -m2 -M2 --threads 4 ${ref_pan} -Oz -o ${ref_pan_chr}
         bcftools index -f --threads 4 ${ref_pan_chr}
         """
 }
@@ -40,34 +40,42 @@ process extract_ref_pan_sites {
         tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx)
 
     output:
-        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx)
+        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx)
 
     script:
         sites_vcf = "ref_pan.chr${chr}.sites.vcf.gz"
+        sites_no_indels_vcf = "ref_pan.chr${chr}.sites.no_indels.vcf.gz"
         sites_tsv = "ref_pan.chr${chr}.sites.tsv.gz"
+        sites_no_indels_tsv = "ref_pan.chr${chr}.sites.no_indels.tsv.gz"
         sites_vcf_idx = "${sites_vcf}.csi"
+        sites_no_indels_vcf_idx = "${sites_no_indels_vcf}.csi"
         sites_tsv_idx = "${sites_tsv}.tbi"
-
+        sites_no_indels_tsv_idx = "${sites_no_indels_tsv}.tbi"
+        // Create 2 versions of sites: one has indels, other doesn't
         """
         bcftools view --drop-genotypes --threads 4 ${ref_pan_chr} -Oz -o ${sites_vcf}
+        bcftools view --drop-genotypes -v snps --threads 4 ${ref_pan_chr} -Oz -o ${sites_no_indels_vcf}
         bcftools index --threads 4 -f ${sites_vcf}
-        bcftools query -f '%CHROM\t%POS\t%REF,%ALT\n' ${sites_vcf} | bgzip --threads 4 -c > ${sites_tsv}
+        bcftools index --threads 4 -f ${sites_no_indels_vcf}
+        bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_vcf} | bgzip --threads 4 -c > ${sites_tsv}
+        bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_no_indels_vcf} | bgzip --threads 4 -c > ${sites_no_indels_tsv}
         tabix -s1 -b2 -e2 ${sites_tsv}
+        tabix -s1 -b2 -e2 ${sites_no_indels_tsv}
         """
 }
 
 process chunk_chr {
     input:
-        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx)
+        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx)
 
     output:
-        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(chunks)
+        tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx), path(chunks)
 
     script:
         window_size = 2000000
         buffer_size = 200000
         chunks = "ref_pan.chr${chr}.chunks.txt"
-
+        
         """
         GLIMPSE_chunk --input ${sites_vcf} --region ${chr} --window-size ${window_size} --buffer-size ${buffer_size} --thread 4 --output ${chunks}
         """
@@ -77,7 +85,7 @@ process chunk_chr {
 // TODO: To impute X-chromosome, give --ploidy-file to bcftools call. Use val(chr) to determine ploidy. 
 process sample_GLs {
     input:
-        tuple val(sample), path(bam), path(bam_idx), path(ref_gen), path(ref_gen_idx), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(chunks)
+        tuple val(sample), path(bam), path(bam_idx), path(ref_gen), path(ref_gen_idx), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx), path(chunks)
 
     output:
         tuple val(sample), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(chunks), path(sample_GLs), path(sample_GLs_idx)
@@ -87,9 +95,9 @@ process sample_GLs {
         sample_GLs_idx = "${sample_GLs}.csi"
         sample_name = "sample_name.txt"
         sample_GLs_temp = "${sample}.chr${chr}.GLs.new_samplename.vcf.gz"
-
+        
         """
-        bcftools mpileup -f ${ref_gen} --skip-indels --redo-BAQ --annotate 'FORMAT/DP' -T ${sites_vcf} --regions ${chr} ${bam} -Ou | bcftools call --threads 4 -Aim -C alleles -T ${sites_tsv} -Oz -o ${sample_GLs}
+        bcftools mpileup -f ${ref_gen} --redo-BAQ --annotate 'FORMAT/DP' -T ${sites_no_indels_vcf} --regions ${chr} ${bam} -Ou | bcftools call --threads 4 -Aim -C alleles -T ${sites_no_indels_tsv} -Oz -o ${sample_GLs}
         echo $sample > $sample_name
         bcftools reheader --samples $sample_name --threads 4 $sample_GLs -o $sample_GLs_temp
         mv $sample_GLs_temp $sample_GLs
@@ -115,7 +123,7 @@ process impute {
             irg=\$(echo \$line | cut -d" " -f3)
             org=\$(echo \$line | cut -d" " -f4)
             imputed=${sample}.chr${chr}.imputed.\${id}.bcf
-            GLIMPSE_phase --input ${sample_GLs} --reference ${ref_pan_chr} --map ${map} --input-region \$irg --output-region \$org --output \$imputed
+            GLIMPSE_phase --impute-reference-only-variants --input ${sample_GLs} --reference ${ref_pan_chr} --map ${map} --input-region \$irg --output-region \$org --output \$imputed
             bcftools index --threads 4 -f \$imputed
         done < ${chunks}
 
@@ -126,7 +134,7 @@ process impute {
 }
 
 process sample {
-    publishDir "${projectDir}/results/glimpse/phased/${sample}/chr${chr}", mode: "move", pattern: "${phased}*"
+    publishDir "${projectDir}/results/glimpse/phased/${sample}/chr${chr}", mode: "copy", pattern: "${phased}*"
     
     input:
         tuple val(sample), val(chr), path(ligated), path(ligated_idx)
@@ -165,8 +173,6 @@ process concat_chrs {
 }
 
 process merge_inds {
-    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "move"
-
     input:
         path(samples_files)
 
@@ -175,7 +181,7 @@ process merge_inds {
 
     script:
         merge_filenames = "merge_filenames.txt"
-        merged = "merged.imputed.ligated.vcf.gz"
+        merged = "merged.imputed.ligated.no_tags.vcf.gz"
         merged_idx = "${merged}.csi"
 
         """
@@ -185,13 +191,51 @@ process merge_inds {
         """
 }
 
+process fill_tags {
+    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
+
+    input:
+        tuple path(merged), path(merged_idx)
+    
+    output:
+        tuple path(merged_fill_tags), path(merged_fill_tags_idx)
+
+    script:
+        merged_fill_tags = "merged.imputed.ligated.vcf.gz"
+        merged_fill_tags_idx = "${merged_fill_tags}.csi"
+
+        """
+        bcftools +fill-tags ${merged} -Oz -o ${merged_fill_tags}
+        bcftools index --threads 4 ${merged_fill_tags}
+        """
+}
+
+process maf_filter {
+    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
+
+    input:
+        tuple path(merged), path(merged_idx)
+
+    output:
+        tuple path(merged_maf), path(merged_maf_idx)
+
+    script:
+        merged_maf = "merged.imputed.ligated.MAF_1.vcf.gz"
+        merged_maf_idx = "${merged_maf}.csi"
+
+        """
+        bcftools filter -i 'MAF[0] > 0.01' ${merged} -Oz -o ${merged_maf}
+        bcftools index --threads 4 ${merged_maf}
+        """
+}
+
 
 
 workflow {
     //println "chr, ref_pan"
     ref_pan_chr_ch = chrs_ch
         .combine(ref_pan_ch)
-        .map( it -> [it[0], it[1], it[1]+".csi"] )
+        .map( it -> it + ["${it[1]}.csi"])
     //ref_pan_chr_ch.view()
 
     //println "chr, ref_pan, sites, chunks"
@@ -201,9 +245,9 @@ workflow {
 
     //println "sample, bam, ref_gen, chr, ref_pan, sites, chunks"
     job_params_ch = samples_ch
-        .map( it -> [it[0], it[1], it[1]+".bai"] )
+        .map( it -> it + ["${it[1]}.bai"] )
         .combine(ref_gen_ch)
-        .map( it -> [it[0], it[1], it[2], it[3], it[3]+".fai"] )
+        .map( it -> it + ["${it[3]}.fai"] )
         .combine(split_ref_pan_ch)
     //job_params_ch.view()
 
@@ -215,7 +259,7 @@ workflow {
     //println "sample, chr, ref_pan, chunks, sample_GLs, map"
     job_params_ch = job_params_ch
         .combine(genetic_map_ch)
-        .map( it -> [it[0], it[1], it[2], it[3], it[4], it[5], it[6], it[7]+"/chr"+it[1]+".gmap.gz"] )
+        .map( it -> it[0..6] + ["${it[7]}/chr${it[1]}.gmap.gz"] )
     //job_params_ch.view()
 
     //println "sample, ligated, phased"
@@ -224,12 +268,14 @@ workflow {
 
     //println "sample, [ligated]"
     imputed_chromosomes_grouped_ch = imputed_chromosomes_ch
-        .map( it -> it[0..2] )  // phased files were published in the previous process. Continue only with ligated.
-        .groupTuple()
+        .map( it -> it[0..2] )  // Phased files were published in the previous process. Continue only with ligated.
+        .groupTuple() // TODO: use the expected values param to specify how many chromosomes were imputed to send to next process ASAP.
     //imputed_chromosomes_grouped_ch.view()
 
     //println "merged"
     concat_chrs(imputed_chromosomes_grouped_ch) | \
     collect | \
-    merge_inds //| view()
+    merge_inds | \
+    fill_tags | \
+    maf_filter //| view()
 }
