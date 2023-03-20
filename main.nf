@@ -30,8 +30,8 @@ process split_ref_pan {
         ref_pan_chr_idx = "${ref_pan_chr}.csi"
 
         """
-        bcftools view -r ${chr} -i "INFO/SVTYPE=''" -m2 -M2 --threads 4 ${ref_pan} -Oz -o ${ref_pan_chr}
-        bcftools index -f --threads 4 ${ref_pan_chr}
+        bcftools view -r ${chr} -i "INFO/SVTYPE=''" -m2 -M2 --threads $task.cpus ${ref_pan} -Oz -o ${ref_pan_chr}
+        bcftools index -f --threads $task.cpus ${ref_pan_chr}
         """
 }
 
@@ -53,12 +53,12 @@ process extract_ref_pan_sites {
         sites_no_indels_tsv_idx = "${sites_no_indels_tsv}.tbi"
         // Create 2 versions of sites: one has indels, other doesn't
         """
-        bcftools view --drop-genotypes --threads 4 ${ref_pan_chr} -Oz -o ${sites_vcf}
-        bcftools view --drop-genotypes -v snps --threads 4 ${ref_pan_chr} -Oz -o ${sites_no_indels_vcf}
-        bcftools index --threads 4 -f ${sites_vcf}
-        bcftools index --threads 4 -f ${sites_no_indels_vcf}
-        bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_vcf} | bgzip --threads 4 -c > ${sites_tsv}
-        bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_no_indels_vcf} | bgzip --threads 4 -c > ${sites_no_indels_tsv}
+        bcftools view --drop-genotypes --threads $task.cpus ${ref_pan_chr} -Oz -o ${sites_vcf}
+        bcftools view --drop-genotypes -v snps --threads $task.cpus ${ref_pan_chr} -Oz -o ${sites_no_indels_vcf}
+        bcftools index --threads $task.cpus -f ${sites_vcf}
+        bcftools index --threads $task.cpus -f ${sites_no_indels_vcf}
+        bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_vcf} | bgzip --threads $task.cpus -c > ${sites_tsv}
+        bcftools query -f '%CHROM\\t%POS\\t%REF,%ALT\\n' ${sites_no_indels_vcf} | bgzip --threads $task.cpus -c > ${sites_no_indels_tsv}
         tabix -s1 -b2 -e2 ${sites_tsv}
         tabix -s1 -b2 -e2 ${sites_no_indels_tsv}
         """
@@ -77,7 +77,7 @@ process chunk_chr {
         chunks = "ref_pan.chr${chr}.chunks.txt"
         
         """
-        GLIMPSE_chunk --input ${sites_vcf} --region ${chr} --window-size ${window_size} --buffer-size ${buffer_size} --thread 4 --output ${chunks}
+        GLIMPSE_chunk --input ${sites_vcf} --region ${chr} --window-size ${window_size} --buffer-size ${buffer_size} --thread $task.cpus --output ${chunks}
         """
 }
 
@@ -97,9 +97,9 @@ process sample_GLs {
         sample_GLs_temp = "${sample}.chr${chr}.GLs.new_samplename.vcf.gz"
         
         """
-        bcftools mpileup -f ${ref_gen} --redo-BAQ --annotate 'FORMAT/DP' -T ${sites_no_indels_vcf} --regions ${chr} ${bam} -Ou | bcftools call --threads 4 -Aim -C alleles -T ${sites_no_indels_tsv} -Oz -o ${sample_GLs}
+        bcftools mpileup -f ${ref_gen} --redo-BAQ --annotate 'FORMAT/DP' -T ${sites_no_indels_vcf} --regions ${chr} ${bam} -Ou | bcftools call --threads $task.cpus -Aim -C alleles -T ${sites_no_indels_tsv} -Oz -o ${sample_GLs}
         echo $sample > $sample_name
-        bcftools reheader --samples $sample_name --threads 4 $sample_GLs -o $sample_GLs_temp
+        bcftools reheader --samples $sample_name --threads $task.cpus $sample_GLs -o $sample_GLs_temp
         mv $sample_GLs_temp $sample_GLs
         bcftools index -f $sample_GLs
         """
@@ -124,12 +124,12 @@ process impute {
             org=\$(echo \$line | cut -d" " -f4)
             imputed=${sample}.chr${chr}.imputed.\${id}.bcf
             GLIMPSE_phase --impute-reference-only-variants --input ${sample_GLs} --reference ${ref_pan_chr} --map ${map} --input-region \$irg --output-region \$org --output \$imputed
-            bcftools index --threads 4 -f \$imputed
+            bcftools index --threads $task.cpus -f \$imputed
         done < ${chunks}
 
         ls ${sample}.chr${chr}.imputed.*.bcf > ${imputed_filenames}
-        GLIMPSE_ligate --thread 4 --input ${imputed_filenames} --output ${ligated}
-        bcftools index --threads 4 -f ${ligated}
+        GLIMPSE_ligate --thread $task.cpus --input ${imputed_filenames} --output ${ligated}
+        bcftools index --threads $task.cpus -f ${ligated}
         """
 }
 
@@ -147,8 +147,8 @@ process sample {
         phased_idx = "${phased}.csi"
 
         """
-        GLIMPSE_sample --thread 4 --input ${ligated} --solve --output ${phased}
-        bcftools index --threads 4 -f ${phased}
+        GLIMPSE_sample --thread $task.cpus --input ${ligated} --solve --output ${phased}
+        bcftools index --threads $task.cpus -f ${phased}
         """    
 }
 
@@ -167,8 +167,8 @@ process concat_chrs {
 
         """
         ls ${sample}.chr*.imputed.ligated.bcf > $concat_filenames
-        bcftools concat --threads 4 --file-list $concat_filenames -Ob | bcftools sort -Ob -o $sorted
-        bcftools index --threads 4 $sorted
+        bcftools concat --threads $task.cpus --file-list $concat_filenames -Ou | bcftools sort -Ob -o $sorted
+        bcftools index --threads $task.cpus $sorted
         """
 }
 
@@ -186,8 +186,8 @@ process merge_inds {
 
         """
         ls *.all_chrs.sorted.bcf > $merge_filenames
-        bcftools merge -m id --file-list $merge_filenames --threads 4 -Oz -o $merged
-        bcftools index --threads 4 $merged
+        bcftools merge -m none --file-list $merge_filenames --threads $task.cpus -Oz -o $merged
+        bcftools index --threads $task.cpus $merged
         """
 }
 
@@ -206,7 +206,7 @@ process fill_tags {
 
         """
         bcftools +fill-tags ${merged} -Oz -o ${merged_fill_tags}
-        bcftools index --threads 4 ${merged_fill_tags}
+        bcftools index --threads $task.cpus ${merged_fill_tags}
         """
 }
 
