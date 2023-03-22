@@ -226,6 +226,7 @@ process fill_tags {
         """
 }
 
+process filter_vcf {
     container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
     publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
 
@@ -233,15 +234,15 @@ process fill_tags {
         tuple path(merged), path(merged_idx)
 
     output:
-        tuple path(merged_maf), path(merged_maf_idx)
+        tuple path(filtered), path(filtered_idx)
 
     script:
-        merged_maf = "merged.imputed.ligated.MAF_1.vcf.gz"
-        merged_maf_idx = "${merged_maf}.csi"
+        filtered = "merged.imputed.ligated.filtered.vcf.gz"
+        filtered_idx = "${filtered}.csi"
 
         """
-        bcftools filter -i 'MAF[0] > 0.01' ${merged} -Oz -o ${merged_maf}
-        bcftools index --threads 4 ${merged_maf}
+        bcftools filter -i 'MAF[0] > 0.01 && INFO/INFO > 0.4' ${merged} -Oz -o ${filtered}
+        bcftools index --threads $task.cpus ${filtered}
         """
 }
 
@@ -293,5 +294,5 @@ workflow {
     collect | \
     merge_inds | \
     fill_tags | \
-    maf_filter //| view()
+    filter_vcf //| view()
 }
