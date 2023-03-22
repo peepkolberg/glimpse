@@ -19,6 +19,8 @@ genetic_map_ch = Channel.fromPath(params.genetic_map, type: "dir")
 
 
 process split_ref_pan {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
+
     input:
         tuple val(chr), path(ref_pan), path(ref_pan_idx)
 
@@ -36,6 +38,8 @@ process split_ref_pan {
 }
 
 process extract_ref_pan_sites {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
+
     input:
         tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx)
 
@@ -65,6 +69,8 @@ process extract_ref_pan_sites {
 }
 
 process chunk_chr {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
+
     input:
         tuple val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx)
 
@@ -84,6 +90,8 @@ process chunk_chr {
 // TODO: Run in parallel with the previous process.
 // TODO: To impute X-chromosome, give --ploidy-file to bcftools call. Use val(chr) to determine ploidy. 
 process sample_GLs {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
+
     input:
         tuple val(sample), path(bam), path(bam_idx), path(ref_gen), path(ref_gen_idx), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(sites_vcf), path(sites_vcf_idx), path(sites_tsv), path(sites_tsv_idx), path(sites_no_indels_vcf), path(sites_no_indels_vcf_idx), path(sites_no_indels_tsv), path(sites_no_indels_tsv_idx), path(chunks)
 
@@ -106,6 +114,8 @@ process sample_GLs {
 }
 
 process impute {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
+
     input:
         tuple val(sample), val(chr), path(ref_pan_chr), path(ref_pan_chr_idx), path(chunks), path(sample_GLs), path(sample_GLs_idx), path(map)
 
@@ -134,6 +144,7 @@ process impute {
 }
 
 process sample {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
     publishDir "${projectDir}/results/glimpse/phased/${sample}/chr${chr}", mode: "copy", pattern: "${phased}*"
     
     input:
@@ -154,6 +165,8 @@ process sample {
 
 // Everything from this point on is my original creation.
 process concat_chrs {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
+
     input:
         tuple val(sample), path(chromosomes_bcfs), path(chromosomes_idxs)
 
@@ -173,6 +186,8 @@ process concat_chrs {
 }
 
 process merge_inds {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
+
     input:
         path(samples_files)
 
@@ -192,6 +207,7 @@ process merge_inds {
 }
 
 process fill_tags {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
     publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
 
     input:
@@ -210,7 +226,7 @@ process fill_tags {
         """
 }
 
-process maf_filter {
+    container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
     publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
 
     input:
