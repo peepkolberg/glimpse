@@ -175,7 +175,7 @@ process concat_chrs {
 
     script:
         concat_filenames = "concat_filenames.txt"
-        sorted = "${sample}.all_chrs.sorted.bcf"
+        sorted = "${sample}.all_chrs.sorted.bcf.gz"
         sorted_idx = "${sorted}.csi"
 
         """
@@ -200,7 +200,7 @@ process merge_inds {
         merged_idx = "${merged}.csi"
 
         """
-        ls *.all_chrs.sorted.bcf > $merge_filenames
+        ls *.all_chrs.sorted.bcf.gz > $merge_filenames
         bcftools merge -m none --file-list $merge_filenames --threads $task.cpus -Oz -o $merged
         bcftools index --threads $task.cpus $merged
         """
