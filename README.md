@@ -1,4 +1,8 @@
-To run the workflow, submit `run.sh` to HPC. Imputation results will appear in directory `results/glimpse`.
+### Recent changes
+* Automatically uses a prebuilt container from quay.io  -  no longer depends on local installations of bcftools, tabix and glimpse
+
+### How to run?
+Submit `run.sh` to HPC. Imputation results will appear in directory `results/glimpse`.
 
 Here's the descriptions and requirements for input parameters:
 * **--samples** TSV file with sample IDs and BAM files. Example in [data/samples.tsv](https://github.com/peepkolberg/glimpse/blob/main/data/samples.tsv). Each sample expects an index file to be present in the same directory as the BAM file. Index file must have the same name as BAM file + ".bai". This is hard-coded in main.nf workflow{} section.
