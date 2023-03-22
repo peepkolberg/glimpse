@@ -6,3 +6,4 @@ results.*
 results.glimpse/*
 slurm-*.out
 .nextflow*
+singularity_img/*
