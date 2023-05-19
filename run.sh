@@ -19,7 +19,5 @@ module load any/singularity/3.11.1
 nextflow -log logs/.nextflow.log run main.nf -profile tartu_hpc \
     --samples /path/to/samples.tsv \
     --chromosomes 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22 \
-    --reference_panel /path/to/reference_panel.vcf.gz \
-    --reference_genome /path/to/reference_genome.fa \
-    --genetic_map /path/to/genetic_map_dir \
+    --outdir ./results \
 #    -resume
