@@ -9,8 +9,8 @@
 
 
 
-module load nextflow
-module load singularity
+module load nextflow/22.04.3
+module load any/singularity/3.11.1
 
 # Maybe sample bam files need to be sorted. An example is given in data/samples.tsv. Each sample expects an index file to be present in the same directory as the bam file. Index file must have the same name as bam file + ".bai". This is hard-coded in main.nf workflow{} section.
 # chromosomes is a comma-separated list of autosomal chromosomes. Sex chromosomes will probably break the code.
