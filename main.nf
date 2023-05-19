@@ -145,7 +145,7 @@ process impute {
 
 process sample {
     container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
-    publishDir "${projectDir}/results/glimpse/phased/${sample}/chr${chr}", mode: "copy", pattern: "${phased}*"
+    publishDir "${params.outdir}/glimpse/phased/${sample}/chr${chr}", mode: "copy", pattern: "${phased}*"
     
     input:
         tuple val(sample), val(chr), path(ligated), path(ligated_idx)
@@ -208,7 +208,7 @@ process merge_inds {
 
 process fill_tags {
     container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
-    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
+    publishDir "${params.outdir}/glimpse/imputed.ligated", mode: "copy"
 
     input:
         tuple path(merged), path(merged_idx)
@@ -228,7 +228,7 @@ process fill_tags {
 
 process filter_vcf {
     container = "quay.io/eqtlcatalogue/glimpse:1.1.1"
-    publishDir "${projectDir}/results/glimpse/imputed.ligated", mode: "copy"
+    publishDir "${params.outdir}/glimpse/imputed.ligated", mode: "copy"
 
     input:
         tuple path(merged), path(merged_idx)
