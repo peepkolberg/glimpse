@@ -7,7 +7,7 @@ The test will impute chromosomes 21 and 22 of two samples (individuals). Runs ca
 
 Submit `run_test.sh` to HPC. No need to specify parameters. Imputed genotypes will appear in directory `results.test/glimpse/imputed.ligated`.
 
-### How to run test?
+### How to run?
 Submit `run.sh` to HPC. Imputed genotypes will appear in directory `{--outdir}/glimpse/imputed.ligated`.
 
 Here's the descriptions and requirements for input parameters:
