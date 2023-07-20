@@ -7,8 +7,6 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=1G
 
-
-
 module load nextflow/22.04.3
 module load any/singularity/3.11.1
 
