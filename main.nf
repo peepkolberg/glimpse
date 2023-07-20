@@ -201,7 +201,7 @@ process merge_inds {
 
         """
         ls *.all_chrs.sorted.bcf.gz > $merge_filenames
-        bcftools merge -m none --file-list $merge_filenames --threads $task.cpus -Oz -o $merged
+        bcftools merge -m none --file-list $merge_filenames --threads $task.cpus -Ou | bcftools +impute-info --threads $task.cpus -Oz -o $merged
         bcftools index --threads $task.cpus $merged
         """
 }
