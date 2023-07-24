@@ -1,6 +1,7 @@
 ### Recent changes
-* Add UT HPC test profile and paths to data
-* Automatically uses a prebuilt container from quay.io  -  no longer depends on local installations of bcftools, tabix and glimpse
+* **Now considers all samples when calculating imputation scores.**
+* *Add UT HPC test profile and paths to data.*
+* *Automatically uses a prebuilt container from quay.io  -  no longer depends on local installations of bcftools, tabix and glimpse.*
 
 ### How to run test?
 The test will impute chromosomes 21 and 22 of two samples (individuals). Runs ca. 40 minutes.
@@ -16,13 +17,13 @@ Here's the descriptions and requirements for input parameters:
 * **--reference_panel** VCF(.gz) file. Expects an index file to be present in the same directory as the panel. Index file must have the same name as panel file + ".csi".
 * **--reference_genome** FA file. Expects an index file to be present in the same directory as the genome. Index file must have the same name as genome file + ".fai".
 * **--genetic_map** Points to a directory. In the directory, expects a separate genetic map file for each chromosome. The filenames must follow this convention: `chr{i}.gmap.gz`, where `{i}` is replaced by chromosome number.
-* **--outdir** Optional parameter to specify the name of the output directory. (default: `./results`)
+* **--outdir** Parameter to specify the name of the output directory.
 
 Some additional notes that might be necessary to follow:
-* Sort input BAM files
+* Sort input BAM files.
 
-To-Do:
-* Tweak each process' memory, CPU, time requirements
+### To-Do:
+* Tweak each process' memory, CPU, time requirements.
 * Refactor the workflow so that process sample_GLs runs in parallel with process chunk_chr. Might save a few minutes.
 
 Workflow follows the steps from this tutorial: https://odelaneau.github.io/GLIMPSE/docs/tutorials/getting_started/#imputation-using-1000gp-reference-panel
